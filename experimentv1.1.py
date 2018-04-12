@@ -1,4 +1,5 @@
 import sklearn.linear_model as SKL
+from sklearn.ensemble import RandomForestClassifier as RFC
 import numpy as np
 import matplotlib.pyplot as plt
 from scipy.stats import percentileofscore
@@ -9,16 +10,16 @@ import copy
 ### experiment bright students math finance
 N = 2000 ## 1000 of each group (groups S and T)
 
-minority_percent = 0.3
+minority_percent = 0.2
 MIN = int(minority_percent * N)
 MAJ = int((1 - minority_percent) * N)
 print(MIN, MAJ)
 p_S_brightmath = 0.9
 p_T_brightmath = 0.1
-bright_percent = 0.4
+bright_percent = 0.2
 
 d = 0.2
-r = 0.2
+r = 0.1
 
 
 ## first attribute is 1 if in group S, otherwise 0 for group T
@@ -35,6 +36,7 @@ def generate_X(biased = False):
 		removed = set(np.random.choice(brightS, int(d/2 * MIN), replace = False))
 	brightS = set(brightS)
 	brightS = brightS.difference(removed)
+	print("Bright S ",len(brightS))
 
 	S[ :,2] = [1 if i in brightS else 0 for i in range(MIN)]
 	S[ :,1] = [1 if ((np.random.rand() > p_S_brightmath and i in brightS) or 
@@ -44,11 +46,13 @@ def generate_X(biased = False):
 	T = np.zeros((MAJ, 3))
 	T[ :,0] = 0
 	brightT = np.random.choice(MAJ, int(bright_percent * MAJ), replace = False)
+	notbrightT = list(set(range(MAJ)).difference(set(brightT)))
 	added = set()
 	if biased == True:
-		added = set(np.random.choice(brightT, int(d/2 * MAJ), replace = False))
+		added = set(np.random.choice(notbrightT, int(d/2 * MAJ), replace = False))
 	brightT = set(brightT)
 	brightT = brightT.union(added)
+	print("Bright T ",len(brightT))
 
 	T[ :,2] = [1 if i in brightT else 0 for i in range(MAJ)]
 	T[ :,1] = [1 if ((np.random.rand() > p_T_brightmath and i in brightT) or 
@@ -69,7 +73,8 @@ X_test = np.append(X_S_test, X_T_test, axis=0) ## use this for testing
 
 
 ### fit regular biased world
-reg = SKL.LogisticRegression()
+# reg = SKL.LogisticRegression()
+reg = RFC()
 
 reg.fit(X_B[:, :2], X_B[ : ,2])
 pred = reg.predict(X_test[:, :2])
@@ -88,7 +93,7 @@ for idx,x in enumerate(X_T[:, 2]):
 	if x > 0:
 		bright_T += [idx]
 
-perturb_ratio =  0.5 # len(not_bright_S) / (len(not_bright_S) + len(bright_T))
+perturb_ratio = len(not_bright_S) / (len(not_bright_S) + len(bright_T))
 # print(perturb_ratio)
 
 
@@ -108,7 +113,8 @@ for i in indices_T:
 X_P = np.append(X_P_S, X_P_T, axis = 0)
 
 
-reg1 = SKL.LogisticRegression()
+# reg1 = SKL.LogisticRegression()
+reg1 = RFC()
 reg1.fit(X_P[:, :2], X_P[:,2])
 pred1 = reg1.predict(X_test[:, :2])
 
