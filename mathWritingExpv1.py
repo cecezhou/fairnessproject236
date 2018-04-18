@@ -10,7 +10,7 @@ import pandas as pd
 ### experiment bright students math finance
 N = 10000 ## 1000 of each group (groups S and T)
 
-minority_percent = 0.5
+minority_percent = 0.3
 MIN = int(minority_percent * N)
 MAJ = int((1 - minority_percent) * N)
 print(MIN, MAJ)
@@ -19,7 +19,7 @@ print(MIN, MAJ)
 bright_percent = 0.2
 
 d = 0.3
-r = 0.3
+r = 0.15
 
 a = 7
 b = 2
@@ -138,14 +138,14 @@ perturb_ratio = 0.5# len(not_bright_S) / (len(not_bright_S) + len(bright_T))
 # print(perturb_ratio)
 
 
-indices_S = np.random.choice(not_bright_S, int(r * N * (perturb_ratio)),replace = False)
+indices_S = np.random.choice(not_bright_S, int(r * MIN * (perturb_ratio)),replace = False)
 X_P_S = copy.deepcopy(X_S)
 for i in indices_S:
 	X_P_S[i, -1] = 1
 
 
 
-indices_T = np.random.choice(bright_T, int(r * N * (1- perturb_ratio)), replace = False)
+indices_T = np.random.choice(bright_T, int(r * MAJ * (1- perturb_ratio)), replace = False)
 X_P_T = copy.deepcopy(X_T)
 
 for i in indices_T:

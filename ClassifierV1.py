@@ -19,7 +19,7 @@ print(MIN, MAJ)
 bright_percent = 0.2
 
 d = 0.3
-r = 0.3
+r = 0.15
 
 a = 7
 b = 2
