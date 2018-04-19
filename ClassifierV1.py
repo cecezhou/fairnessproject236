@@ -23,6 +23,9 @@ r = 0.15
 
 a = 7
 b = 2
+
+quota = 1500
+
 ## first attribute is 1 if in group S, otherwise 0 for group T
 
 ### Generate Group S, Group T data
@@ -180,10 +183,32 @@ X_P = np.array(X_P)
 # reg1 = SKL.LogisticRegression()
 reg1 = RFC(n_estimators = 20)
 reg1.fit(X_P[:, :-1], X_P[:,-1])
+
 pred1 = reg1.predict(X_test[:, :-1])
+
+def predict(X_P, C):
+	ranks_P = C.predict_proba(X_P[ : , :-1])
+	newData_P = np.append(X_P, np.array([[x] for x in ranks_P[ :,1]]), axis = 1)
+	newDf_P = pd.DataFrame(newData_P)
+	sorted_Df = newDf_P.sort_values(4)
+	quota = int(sum(pred1))
+	top_indices = set(sorted_Df.index.tolist()[-quota:])
+	# new_indices = 
+	# print(newDf_P.iloc[top_indices[0]])
+	# for indices: setting classifications to 1 and rest to 0
+	pred = np.array([1 if i in top_indices else 0 for i in range(N)])
+	return pred
+
+pred2 = predict(X_P, reg1)
 
 # reg.predict()
 print("Score for Biased perturbed " ,reg1.score(X_test[:, :-1], X_test[:, -1]))
+
+results = [int((a and not b) or (b and not a)) for a, b in zip(pred2, X_test[:, -1])]
+score = (N - sum(results)) / N
+print("Score for Biased perturbed quota ", score)
+# print("Score for Biased perturbed quota " ,reg2.score(X_test[:, :-1], X_test[:, -1]))
+
 
 ## prediction is different
 # diff = pred1 + pred
