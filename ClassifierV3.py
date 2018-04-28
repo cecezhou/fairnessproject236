@@ -17,16 +17,32 @@ import copy
 import pandas as pd
 
 
-model_strings = ["LR", "RFC", "ABC", "MLPC", "KNC", "SVC", "DTC", "GNB", "QDA"]
-model_types = [LR, RFC, ABC, MLPC, KNC, SVC, DTC, GNB, QDA]
+model_strings = ["LR",
+                 "RFC",
+                 #"ABC",
+                 "MLPC",
+                 "KNC",
+                 "SVC",
+                 #"DTC",
+                 #"GNB",
+                 "QDA"]
+model_types = [LR,
+               RFC,
+               #ABC,
+               MLPC,
+               KNC,
+               SVC,
+               #DTC,
+               #GNB,
+               QDA]
 models = [LR(),
           RFC(n_estimators=30),
-          ABC(),
+          #ABC(),
           MLPC(),
           KNC(),
           SVC(probability=True),
-          DTC(),
-          GNB(),
+          #DTC(),
+          #GNB(),
           QDA()]
 models2 = copy.deepcopy(models)
 
@@ -42,7 +58,7 @@ MAJ = int((1 - minority_percent) * N)
 # p_T_brightmath = 0.1
 bright_percent = 0.2
 
-d = 0.3
+d = 0.2 # this is percent shift of added bias (of MIN and MAJ groups)
 r = 0.15
 
 a = 7
@@ -52,8 +68,9 @@ quota = 1700
 
 ## first attribute is 1 if in group S, otherwise 0 for group T
 
-### Generate Group S, Group T data
-## Group Label, Math Grades, Writing Grades, Bright (or not)
+## Generate Group S, Group T data
+### X columns:
+### Group Label, Math Grades, Writing Grades, Bright (or not)
 
 def generate_X(biased = False):
 	### S
@@ -156,7 +173,7 @@ print("Score for Biased RFC", reg_RFC.score(X_test[:, :-1], X_test[:, -1]))
 ## predict on the training data to get some probabilities
 
 # create perturbed data
-def generate_X_P(model, p_ratio=0.5):
+def generate_X_P(model, perturb_ratio=0.5):
 	X_B_copy = copy.deepcopy(X_B)
 	ranks = model.predict_proba(X_B_copy[ : , :-1])
 
@@ -177,7 +194,7 @@ def generate_X_P(model, p_ratio=0.5):
 		if x > 0:
 			bright_T += [idx]
 
-	perturb_ratio = 0.5 #len(not_bright_S) / (len(not_bright_S) + len(bright_T))
+	# perturb_ratio = 0.5 #len(not_bright_S) / (len(not_bright_S) + len(bright_T))
 
 	X_P = copy.deepcopy(X_B_copy)
 	X_P = pd.DataFrame(X_P)
@@ -198,7 +215,7 @@ def generate_X_P(model, p_ratio=0.5):
 	return X_P
 
 # scatter(X_P, "PerturbedV2")
-X_P = generate_X_P(reg_RFC, p_ratio=0.5)
+X_P = generate_X_P(reg_RFC, perturb_ratio=0.5)
 
 reg1_LR = SKL.LogisticRegression()
 reg1_RFC = RFC(n_estimators = 30)
@@ -325,7 +342,7 @@ for i, model in enumerate(models):
 	b_scores.append(b_score)
 	
 	## biased perturbed
-	X_P = generate_X_P(model, p_ratio=0.5)
+	X_P = generate_X_P(model, perturb_ratio=0.5)
 	model2 = models2[i]
 	model2.fit(X_P[:, :-1], X_P[:,-1])
 	bp_score = model2.score(X_test[:, :-1], X_test[:, -1])
@@ -335,6 +352,74 @@ for i, model in enumerate(models):
 print(model_strings)
 print(b_scores)
 print(bp_scores)
+
+
+## Testing individual fairness
+### Similar individuals should be classified similarly
+
+## create custom data
+M = 100
+X_IF = []
+for i in range(2):
+	for j in range(M):
+		for k in range(M):
+			X_IF.append([i, j/M, k/M])
+X_IF = np.array(X_IF)
+
+
+def produce_graphs(X, name_S, name_T):
+	df = pd.DataFrame(X)
+	dfSBright = df[(df[3] == 1) & (df[0] == 1)]
+	dfSNot = df[(df[3] == 0) & (df[0] ==1) ]
+	dfTBright = df[(df[3] == 1) & (df[0] == 0)]
+	dfTNot = df[df[3] == 0  & (df[0] == 0)]
+
+	data = (dfSNot, dfSBright)
+	colors = ("blue", "red")
+	groups = ("SNot", "SBright")
+
+	fig = plt.figure()
+	ax = fig.add_subplot(1,1,1)
+	for data, color, group in zip(data, colors, groups):
+		ax.scatter(data[1],data[2], c= color, edgecolors = None, label = group, s = 1)
+	plt.legend(loc = 3)
+	plt.savefig(name_S)
+	plt.close()
+
+	data = (dfTNot, dfTBright)
+	colors = ("blue", "red")
+	groups = ("TNot", "TBright")
+
+	fig = plt.figure()
+	ax = fig.add_subplot(1,1,1)
+	for data, color, group in zip(data, colors, groups):
+		ax.scatter(data[1],data[2], c= color, edgecolors = None, label = group, s = 1)
+	plt.legend(loc = 3)
+	plt.savefig(name_T)
+	plt.close()
+
+
+pred_IF, pred2_IF = [], []
+for i, model in enumerate(models):
+	X_IF_new = copy.deepcopy(X_IF)
+	## predict using biased model + produce graph
+	pred_IF.append(model.predict(X_IF[:,:3]))
+	X_IF_new = np.c_[X_IF_new, np.array(pred_IF[i])]
+	name_S = "individual_fairness/%s_S_M-%04.f_b" % (model_strings[i], M)
+	name_T = "individual_fairness/%s_T_M-%04.f_b" % (model_strings[i], M)
+	produce_graphs(X_IF_new, name_S, name_T)
+
+	X_IF_new = copy.deepcopy(X_IF)
+	## predict using biased, perturbed model + produce graph
+	pred2_IF.append(models2[i].predict(X_IF[:,:3]))
+	X_IF_new = np.c_[X_IF_new, np.array(pred2_IF[i])]
+	name_S = "individual_fairness/%s_S_M-%04.f_bp" % (model_strings[i], M)
+	name_T = "individual_fairness/%s_T_M-%04.f_bp" % (model_strings[i], M)
+	produce_graphs(X_IF_new, name_S, name_T)
+
+
+
+
 
 
 
